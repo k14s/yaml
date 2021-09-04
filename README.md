@@ -1,4 +1,16 @@
-# YAML support for the Go language
+# YAML support for the Go language (ytt fork)
+
+This branch is an attempt to track changes made to the original project for use
+in `ytt`.
+
+At this time, only the changes between v2.2.2 (the original starting point) and
+the initial commit in k14s/ytt along with changes required to make the tests
+pass again are captured here.
+
+_(original README.md, follows, below.)_
+
+---
+
 
 Introduction
 ------------
