@@ -4,15 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"net"
-	"os"
-
+	"github.com/k14s/yaml.v2"
 	. "gopkg.in/check.v1"
-	"gopkg.in/yaml.v2"
 )
 
 type jsonNumberT string
@@ -335,7 +334,7 @@ var marshalTests = []struct {
 
 	// Ordered maps.
 	{
-		&yaml.MapSlice{{"b", 2}, {"a", 1}, {"d", 4}, {"c", 3}, {"sub", yaml.MapSlice{{"e", 5}}}},
+		&yaml.MapSlice{{"b", 2, 0}, {"a", 1, 0}, {"d", 4, 0}, {"c", 3, 0}, {"sub", yaml.MapSlice{{"e", 5, 0}}, 0}},
 		"b: 2\na: 1\nd: 4\nc: 3\nsub:\n  e: 5\n",
 	},
 

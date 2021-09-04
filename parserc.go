@@ -589,6 +589,10 @@ func yaml_parser_parse_block_sequence_entry(parser *yaml_parser_t, event *yaml_e
 	}
 
 	if token.typ == yaml_BLOCK_ENTRY_TOKEN {
+		parser.pendingSeqItemEvent = &yaml_event_t{
+			start_mark: token.start_mark,
+			end_mark:   token.end_mark,
+		}
 		mark := token.end_mark
 		skip_token(parser)
 		token = peek_token(parser)
@@ -635,6 +639,10 @@ func yaml_parser_parse_indentless_sequence_entry(parser *yaml_parser_t, event *y
 	}
 
 	if token.typ == yaml_BLOCK_ENTRY_TOKEN {
+		parser.pendingSeqItemEvent = &yaml_event_t{
+			start_mark: token.start_mark,
+			end_mark:   token.end_mark,
+		}
 		mark := token.end_mark
 		skip_token(parser)
 		token = peek_token(parser)
@@ -770,6 +778,10 @@ func yaml_parser_parse_block_mapping_value(parser *yaml_parser_t, event *yaml_ev
 func yaml_parser_parse_flow_sequence_entry(parser *yaml_parser_t, event *yaml_event_t, first bool) bool {
 	if first {
 		token := peek_token(parser)
+		parser.pendingSeqItemEvent = &yaml_event_t{
+			start_mark: token.start_mark,
+			end_mark:   token.end_mark,
+		}
 		parser.marks = append(parser.marks, token.start_mark)
 		skip_token(parser)
 	}
@@ -780,6 +792,10 @@ func yaml_parser_parse_flow_sequence_entry(parser *yaml_parser_t, event *yaml_ev
 	if token.typ != yaml_FLOW_SEQUENCE_END_TOKEN {
 		if !first {
 			if token.typ == yaml_FLOW_ENTRY_TOKEN {
+				parser.pendingSeqItemEvent = &yaml_event_t{
+					start_mark: token.start_mark,
+					end_mark:   token.end_mark,
+				}
 				skip_token(parser)
 				token = peek_token(parser)
 				if token == nil {

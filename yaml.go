@@ -22,6 +22,12 @@ type MapSlice []MapItem
 // MapItem is an item in a MapSlice.
 type MapItem struct {
 	Key, Value interface{}
+	Line       int
+}
+
+type ArrayItem struct {
+	Value interface{}
+	Line  int
 }
 
 // The Unmarshaler interface may be implemented by types to customize their
@@ -78,7 +84,8 @@ type Marshaler interface {
 // supported tag options.
 //
 func Unmarshal(in []byte, out interface{}) (err error) {
-	return unmarshal(in, out, false)
+	_, err = unmarshal(in, out, false)
+	return err
 }
 
 // UnmarshalStrict is like Unmarshal except that any fields that are found
@@ -86,13 +93,20 @@ func Unmarshal(in []byte, out interface{}) (err error) {
 // keys that are duplicates, will result in
 // an error.
 func UnmarshalStrict(in []byte, out interface{}) (err error) {
+	_, err = unmarshal(in, out, true)
+	return err
+}
+
+func UnmarshalWithComments(in []byte, out interface{}) ([]Comment, error) {
 	return unmarshal(in, out, true)
 }
 
 // A Decorder reads and decodes YAML values from an input stream.
 type Decoder struct {
-	strict bool
-	parser *parser
+	strict                bool
+	useMapSlice           bool
+	parser                *parser
+	lastDocumentStartLine *int
 }
 
 // NewDecoder returns a new decoder that reads from r.
@@ -111,13 +125,22 @@ func (dec *Decoder) SetStrict(strict bool) {
 	dec.strict = strict
 }
 
+func (dec *Decoder) SetForceMapSlice(useMapSlice bool) {
+	dec.useMapSlice = useMapSlice
+}
+
 // Decode reads the next YAML-encoded value from its input
 // and stores it in the value pointed to by v.
 //
 // See the documentation for Unmarshal for details about the
 // conversion of YAML into a Go value.
 func (dec *Decoder) Decode(v interface{}) (err error) {
+	dec.lastDocumentStartLine = nil
+	dec.parser.parser.comments = nil
 	d := newDecoder(dec.strict)
+	if dec.useMapSlice {
+		d.mapType = reflect.TypeOf(MapSlice{})
+	}
 	defer handleErr(&err)
 	node := dec.parser.parse()
 	if node == nil {
@@ -131,10 +154,32 @@ func (dec *Decoder) Decode(v interface{}) (err error) {
 	if len(d.terrors) > 0 {
 		return &TypeError{d.terrors}
 	}
+	docLine := d.doc.line
+	dec.lastDocumentStartLine = &docLine
 	return nil
 }
 
-func unmarshal(in []byte, out interface{}, strict bool) (err error) {
+func (dec *Decoder) DocumentStartLine() int {
+	if dec.lastDocumentStartLine != nil {
+		return *dec.lastDocumentStartLine
+	}
+	panic("document start line is not set")
+}
+
+func (dec *Decoder) Comments() []Comment {
+	var comments []Comment
+	for _, c := range dec.parser.parser.comments {
+		comments = append(comments, Comment{Data: string(c.value), Line: c.start_mark.line})
+	}
+	return comments
+}
+
+type Comment struct {
+	Data string
+	Line int
+}
+
+func unmarshal(in []byte, out interface{}, strict bool) (comments []Comment, err error) {
 	defer handleErr(&err)
 	d := newDecoder(strict)
 	p := newParser(in)
@@ -148,9 +193,12 @@ func unmarshal(in []byte, out interface{}, strict bool) (err error) {
 		d.unmarshal(node, v)
 	}
 	if len(d.terrors) > 0 {
-		return &TypeError{d.terrors}
+		return nil, &TypeError{d.terrors}
 	}
-	return nil
+	for _, c := range p.parser.comments {
+		comments = append(comments, Comment{Data: string(c.value), Line: c.start_mark.line})
+	}
+	return comments, nil
 }
 
 // Marshal serializes the value provided into a YAML document. The structure

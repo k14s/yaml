@@ -15,8 +15,10 @@ const (
 	documentNode = 1 << iota
 	mappingNode
 	sequenceNode
+	sequenceItemNode
 	scalarNode
 	aliasNode
+	commentNode
 )
 
 type node struct {
@@ -203,6 +205,14 @@ func (p *parser) sequence() *node {
 	p.anchor(n, p.event.anchor)
 	p.expect(yaml_SEQUENCE_START_EVENT)
 	for p.peek() != yaml_SEQUENCE_END_EVENT {
+		if p.parser.pendingSeqItemEvent != nil {
+			n.children = append(n.children, &node{
+				kind:   sequenceItemNode,
+				line:   p.parser.pendingSeqItemEvent.start_mark.line,
+				column: p.parser.pendingSeqItemEvent.start_mark.column,
+			})
+			p.parser.pendingSeqItemEvent = nil
+		}
 		n.children = append(n.children, p.parse())
 	}
 	p.expect(yaml_SEQUENCE_END_EVENT)
@@ -214,7 +224,7 @@ func (p *parser) mapping() *node {
 	p.anchor(n, p.event.anchor)
 	p.expect(yaml_MAPPING_START_EVENT)
 	for p.peek() != yaml_MAPPING_END_EVENT {
-		n.children = append(n.children, p.parse(), p.parse())
+		n.children = append(n.children, p.parse())
 	}
 	p.expect(yaml_MAPPING_END_EVENT)
 	return n
@@ -541,6 +551,20 @@ func settableValueOf(i interface{}) reflect.Value {
 }
 
 func (d *decoder) sequence(n *node, out reflect.Value) (good bool) {
+	newChildren := []*node{}
+	lineNums := []int{}
+	for _, child := range n.children {
+		if child.kind == sequenceItemNode {
+			lineNums = append(lineNums, child.line)
+			continue
+		}
+		newChildren = append(newChildren, child)
+	}
+	n.children = newChildren
+	if len(n.children) != len(lineNums) {
+		panic("expected len of sequence children to match len of children line nums")
+	}
+
 	l := len(n.children)
 
 	var iface reflect.Value
@@ -560,12 +584,12 @@ func (d *decoder) sequence(n *node, out reflect.Value) (good bool) {
 		return false
 	}
 	et := out.Type().Elem()
-
 	j := 0
 	for i := 0; i < l; i++ {
 		e := reflect.New(et).Elem()
 		if ok := d.unmarshal(n.children[i], e); ok {
-			out.Index(j).Set(e)
+			eItem := reflect.ValueOf(ArrayItem{Value: e.Interface(), Line: lineNums[i]})
+			out.Index(j).Set(eItem)
 			j++
 		}
 	}
@@ -665,7 +689,7 @@ func (d *decoder) mappingSlice(n *node, out reflect.Value) (good bool) {
 			d.merge(n.children[i+1], out)
 			continue
 		}
-		item := MapItem{}
+		item := MapItem{Line: n.children[i].line}
 		k := reflect.ValueOf(&item.Key).Elem()
 		if d.unmarshal(n.children[i], k) {
 			v := reflect.ValueOf(&item.Value).Elem()

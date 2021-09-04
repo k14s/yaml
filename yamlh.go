@@ -139,6 +139,7 @@ const (
 	yaml_ANCHOR_TOKEN // An ANCHOR token.
 	yaml_TAG_TOKEN    // A TAG token.
 	yaml_SCALAR_TOKEN // A SCALAR token.
+	yaml_COMMENT_TOKEN
 )
 
 func (tt yaml_token_type_t) String() string {
@@ -187,6 +188,8 @@ func (tt yaml_token_type_t) String() string {
 		return "yaml_TAG_TOKEN"
 	case yaml_SCALAR_TOKEN:
 		return "yaml_SCALAR_TOKEN"
+	case yaml_COMMENT_TOKEN:
+		return "yaml_COMMENT_TOKEN"
 	}
 	return "<unknown token>"
 }
@@ -217,6 +220,10 @@ type yaml_token_t struct {
 
 	// The version directive major/minor (for yaml_VERSION_DIRECTIVE_TOKEN).
 	major, minor int8
+}
+
+func (t *yaml_token_t) String() string {
+	return fmt.Sprintf("Token(typ=%s, value=%s)", t.typ.String(), string(t.value))
 }
 
 // Events
@@ -592,6 +599,9 @@ type yaml_parser_t struct {
 	aliases []yaml_alias_data_t // The alias data.
 
 	document *yaml_document_t // The currently parsed document.
+
+	comments            []yaml_token_t
+	pendingSeqItemEvent *yaml_event_t
 }
 
 // Emitter Definitions
